@@ -1,25 +1,106 @@
-import {capture, AbstractEntity, State} from '../';
+import {capture, AbstractEntity, Collection} from '../';
+
 
 @capture
-class Entity extends AbstractEntity<Entity>
+class Monster extends AbstractEntity<Monster>
 {
     x:number = null;
     y:number = null;
+    hitpoints:number = null;
+    speed:number = null;
+    ac:number = null;
+    iniative:number = null;
 }
 
-let state1 = new State<Entity>(Entity);
+function spawnOrc(x:number, y:number)
+{
+    let c = new Monster();
+    c.x = x;
+    c.y = y;
+    c.ac = 13;
+    c.hitpoints = 15;
+    c.speed = 30;
+    return c;
+}
 
-let e = state1.pushEntity(new Entity("0"));
-e.x = 10;
-e.y = 20;
+let monsters = new Collection<Monster>(Monster);
+monsters.pushEntity(spawnOrc(0, 0));
+monsters.pushEntity(spawnOrc(60, 60));
 
-e = state1.pushEntity(new Entity("1"));
-e.x = 30;
-e.y = 40;
+let round = 0;
+
+function d20(modifier:number = 0)
+{
+    return Math.ceil(Math.random() * 20) + modifier;
+}
+
+function d6(modifier:number = 0)
+{
+    return Math.ceil(Math.random() * 6) + modifier;
+}
+
+console.clear();
+let order = [] as Monster[];
 
 
-let state2 = new State<Entity>(Entity);
-state2.pushMutations(JSON.parse(JSON.stringify(state1.popMutations())));
+function findEnemy(me:Monster)
+{
+    let enemy = monsters.filter(m=>m != me && m.hitpoints > 0)[0];
+    return enemy;
+}
 
-console.log(state1.entities["0"]);
-console.log(state2.entities["0"]);
+function DoRound()
+{
+    if (round == 0)
+    {
+        console.log("Roll for initiative");
+        monsters.forEach((m)=>
+        {
+            m.iniative = d20();
+            order.push(m)
+        });
+
+        order.sort((a,b)=>b.iniative - a.iniative);
+    }
+    else
+    {
+        console.log("Starting round " + round);
+        for (let me of order)
+        {
+            if (me.hitpoints > 0)
+            {
+                let enemy = findEnemy(me);
+                if (enemy != null)
+                {
+                    let attack = d20(5);
+                    let hit = attack > enemy.ac;
+                    
+                    console.log(`${me.id} attacks ${enemy.id}, rolls ${attack}`);
+                    if (hit)
+                    {
+                        let dmg = d6(3);
+                        console.log(`and hits! for ${dmg} damage`);
+                        enemy.hitpoints -= dmg;
+                        if (enemy.hitpoints <= 0)
+                        { 
+                            enemy.hitpoints = 0;
+                            console.log(`${enemy.id} was slain!`);
+                        }
+                    }
+                    else
+                    {
+                        console.log("and misses!");
+                    }
+
+                }
+            }
+        }
+    }
+
+    round++;
+}
+
+for (let i = 0; i < 10; i++)
+{
+    DoRound();
+}

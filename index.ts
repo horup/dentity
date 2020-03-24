@@ -31,18 +31,23 @@ export function capture<T>(t:any):any
     }
 }
 
+
+
 export abstract class AbstractEntity<T>
 {
-    readonly id:string;
-    constructor(id:string)
+    readonly id:number;
+    constructor(props?:Partial<T>)
     {
-        this.id = id;
+        for (let k in props)
+        {
+            (this as any)[k] = props[k];
+        }
     }
     _mutation:Partial<T> = {};
     popMutation():Partial<T>
     {
         const res = this._mutation;
-        this._mutation = null;
+        delete this._mutation;
         return res;
     }
 
@@ -52,57 +57,86 @@ export abstract class AbstractEntity<T>
 
 interface Mutations<T>
 {
-    added:T[],
-    changes:{id:string, m:Partial<T>}[],
-    removed:T[]
+    added:{[id:number]:T};
+    changes:{[id:number]:Partial<T>};
+    removed:{[id:number]:T};
 }
 
 /** Encapsulates the state of zero or more entities */
-export class State<T extends AbstractEntity<T>>
+export class Collection<T extends AbstractEntity<T>>
 {
-    entities:{[id:string]:T} = {};
-    added:T[] = [];
-    removed:T[] = [];
-    entityConstructor:(new (id:string)=>T);
+    nextId:number = 0;
+    entities:{[id:number]:T} = {};
+    added:{[id:number]:T} = {};
+    removed:{[id:number]:T} = {};
+    entityConstructor:(new ()=>T);
 
-    constructor(entityConstructor:new (id:string)=>T)
+    constructor(entityConstructor:new ()=>T)
     {
         this.entityConstructor = entityConstructor;
     }
 
+    /** Pushes the entity to the collection, assigning it an id within the collection */
     pushEntity(e:T):T
     {
+        (e.id as any) = this.nextId++;
         this.entities[e.id] = e;
-        this.added.push({...e});
+        this.added[e.id] = e;
         return e;
     }
 
+    forEach(f:(e:T)=>any)
+    {
+        for (let id in this.entities)
+        {
+            if (f(this.entities[parseInt(id)]) == true)
+                break;
+        }
+    }
+
+    filter(f:(e:T)=>boolean)
+    {
+        let filtered = [] as T[];
+        for (let id in this.entities)
+        {
+            let e = this.entities[id];
+            if (f(e))
+            {
+                filtered.push(e);
+            }
+        }
+
+        return filtered;
+    }
+
+    /** Removes the entity from the collection */
     removeEntity(e:T)
     {
         delete this.entities[e.id];
-        this.removed.push(e);
+        this.removed[e.id] = e;
     }
 
     private popEntityMutations()
     {
-        const mutations:{id:string, m:Partial<T>}[] = [];
+        const mutations:{[id:number] : Partial<T>} = {};
         for (let id in this.entities)
         {
             let e = this.entities[id];
             let mut = e.popMutation();
             if (mut != null)
             {
-                mutations.push({id:e.id,m:mut});
+                mutations[id] = mut;
             }
         }
 
         return mutations;
     }
 
+    /** Collects all mutations and pops them from the collection */
     popMutations()
     {
-        let added = [...this.added];
-        let removed = [...this.removed];
+        let added = {...this.added};
+        let removed = {...this.removed};
         let changes = this.popEntityMutations()
         this.added = [];
         this.removed = [];
@@ -113,23 +147,28 @@ export class State<T extends AbstractEntity<T>>
         } as Mutations<T>
     }
 
+    /** Pushes mutations to the collection */
     pushMutations(mutations:Mutations<T>)
     {
-        for (let added of mutations.added)
+        for (let id in mutations.added)
         {
+            let added = mutations.added[id];
             (Object as any).setPrototypeOf(added, this.entityConstructor.prototype);
             added.init();
+            if (added.id >= this.nextId)
+                this.nextId = added.id + 1;
             this.entities[added.id] = added;
         }
 
-        for (let mut of mutations.changes)
+        for (let id in mutations.changes)
         {
-            let e = this.entities[mut.id];
+            const change = mutations.changes[id];
+            let e = this.entities[id];
             if (e != null)
             {
-                for (let k in mut.m)
+                for (let k in change)
                 {
-                    e[k] = mut.m[k];
+                    e[k] = change[k];
                 }
             }
         }
