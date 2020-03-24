@@ -1,0 +1,19 @@
+{
+  "name": "dentity",
+  "version": "1.0.0",
+  "description": "dentity is a typescript library that exposed a library to manage entities using decorators",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/horup/dentity.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/horup/dentity/issues"
+  },
+  "homepage": "https://github.com/horup/dentity#readme"
+}
