@@ -5,6 +5,11 @@ export function capture<T>(t:any):any
         constructor(id:string)
         {
             super(id);
+            this.init();
+        }
+
+        init()
+        {
             for (let key of Object.keys(this))
             {
                 if (key[0] == "_" || key == "id")
@@ -40,6 +45,8 @@ export abstract class AbstractEntity<T>
         this._mutation = null;
         return res;
     }
+
+    init() {};
 }
 
 
@@ -63,10 +70,10 @@ export class State<T extends AbstractEntity<T>>
         this.entityConstructor = entityConstructor;
     }
 
-    addEntity(e:T):T
+    pushEntity(e:T):T
     {
         this.entities[e.id] = e;
-        this.added.push(e);
+        this.added.push({...e});
         return e;
     }
 
@@ -110,7 +117,8 @@ export class State<T extends AbstractEntity<T>>
     {
         for (let added of mutations.added)
         {
-            (Object as any).setPrototypeOf(added, this.entityConstructor);
+            (Object as any).setPrototypeOf(added, this.entityConstructor.prototype);
+            added.init();
             this.entities[added.id] = added;
         }
 
