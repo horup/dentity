@@ -37,8 +37,8 @@ export abstract class AbstractEntity<T>
     popMutation():Partial<T>
     {
         const res = this._mutation;
-        this._mutation = {};
-        return null;
+        this._mutation = null;
+        return res;
     }
 }
 
@@ -46,19 +46,28 @@ export abstract class AbstractEntity<T>
 interface Mutations<T>
 {
     added:T[],
-    mutations:{id:string, m:Partial<T>}[],
+    changes:{id:string, m:Partial<T>}[],
     removed:T[]
 }
+
+/** Encapsulates the state of zero or more entities */
 export class State<T extends AbstractEntity<T>>
 {
     entities:{[id:string]:T} = {};
     added:T[] = [];
     removed:T[] = [];
+    entityConstructor:(new (id:string)=>T);
 
-    addEntity(e:T)
+    constructor(entityConstructor:new (id:string)=>T)
+    {
+        this.entityConstructor = entityConstructor;
+    }
+
+    addEntity(e:T):T
     {
         this.entities[e.id] = e;
         this.added.push(e);
+        return e;
     }
 
     removeEntity(e:T)
@@ -74,7 +83,10 @@ export class State<T extends AbstractEntity<T>>
         {
             let e = this.entities[id];
             let mut = e.popMutation();
-            mutations.push({id:e.id,m:mut});
+            if (mut != null)
+            {
+                mutations.push({id:e.id,m:mut});
+            }
         }
 
         return mutations;
@@ -82,22 +94,27 @@ export class State<T extends AbstractEntity<T>>
 
     popMutations()
     {
+        let added = [...this.added];
+        let removed = [...this.removed];
+        let changes = this.popEntityMutations()
+        this.added = [];
+        this.removed = [];
         return {
-            added:[...this.added],
-            mutations:this.popEntityMutations(),
-            removed:[...this.removed]
-        }
+            added:added,
+            changes:changes,
+            removed:removed
+        } as Mutations<T>
     }
 
-    pushMutations(mutations:Mutations<T>, entityConstructor:any)
+    pushMutations(mutations:Mutations<T>)
     {
         for (let added of mutations.added)
         {
-            (Object as any).setPrototypeOf(added, entityConstructor);
+            (Object as any).setPrototypeOf(added, this.entityConstructor);
             this.entities[added.id] = added;
         }
 
-        for (let mut of mutations.mutations)
+        for (let mut of mutations.changes)
         {
             let e = this.entities[mut.id];
             if (e != null)
